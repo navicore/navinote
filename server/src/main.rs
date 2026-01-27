@@ -2,7 +2,7 @@ mod db;
 mod models;
 mod routes;
 
-use axum::routing::get;
+use axum::routing::{get, patch, put};
 use axum::Router;
 use tower_http::services::ServeDir;
 

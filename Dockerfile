@@ -5,7 +5,7 @@ RUN npm ci
 COPY pwa/ ./
 RUN npm run build
 
-FROM rust:1.83-bookworm AS rust-build
+FROM rust:1.85-bookworm AS rust-build
 WORKDIR /app
 COPY Cargo.toml ./
 COPY server/ server/

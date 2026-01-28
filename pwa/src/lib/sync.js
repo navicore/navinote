@@ -2,6 +2,8 @@ import { apiFetch } from './api.js';
 import { getAllNotes, putNote, deleteNote } from './db.js';
 
 export async function syncNotes() {
+  const errors = [];
+
   // Push local notes to server
   const local = await getAllNotes();
   const pending = local.filter(n => !n._synced);
@@ -15,8 +17,8 @@ export async function syncNotes() {
       // Replace local with server version
       await deleteNote(note.id);
       await putNote({ ...saved, _synced: true });
-    } catch {
-      // Keep local copy if server unreachable
+    } catch (e) {
+      errors.push(e.message);
     }
   }
 
@@ -26,7 +28,11 @@ export async function syncNotes() {
     for (const note of remote) {
       await putNote({ ...note, _synced: true });
     }
-  } catch {
-    // Offline - use local data
+  } catch (e) {
+    errors.push(e.message);
+  }
+
+  if (errors.length > 0) {
+    throw new Error(errors[0]);
   }
 }

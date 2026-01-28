@@ -11,6 +11,7 @@
   let syncing = $state(false);
   let token = $state(getToken());
   let showSettings = $state(!getToken());
+  let syncError = $state('');
 
   async function load() {
     notes = await getAllNotes();
@@ -44,9 +45,12 @@
 
   async function doSync() {
     syncing = true;
+    syncError = '';
     try {
       await syncNotes();
       await load();
+    } catch (e) {
+      syncError = e.message;
     } finally {
       syncing = false;
     }
@@ -73,6 +77,10 @@
       <button onclick={() => showSettings = !showSettings}>settings</button>
     </div>
   </header>
+
+  {#if syncError}
+    <div class="error">{syncError}</div>
+  {/if}
 
   {#if showSettings}
     <div class="settings">
@@ -193,6 +201,14 @@
     padding: 0.1rem 0.4rem;
     border-radius: 4px;
     font-size: 0.7rem;
+  }
+  .error {
+    background: #4a1a1a;
+    color: #ff6b6b;
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
   }
   .delete-btn {
     background: transparent;

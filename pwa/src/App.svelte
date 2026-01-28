@@ -148,7 +148,7 @@
     align-items: center;
     margin-bottom: 1rem;
   }
-  h1 { margin: 0; font-size: 1.4rem; color: #e94560; }
+  h1 { margin: 0; font-size: 1.4rem; color: #7a9eb8; }
   .header-actions { display: flex; gap: 0.5rem; }
   .settings {
     background: #16213e;
@@ -181,8 +181,8 @@
     padding: 0.5rem 1rem;
     border: none;
     border-radius: 6px;
-    background: #e94560;
-    color: white;
+    background: #4a6fa5;
+    color: #e0e0e0;
     cursor: pointer;
     font-size: 0.9rem;
   }
@@ -203,8 +203,8 @@
     font-size: 0.7rem;
   }
   .error {
-    background: #4a1a1a;
-    color: #ff6b6b;
+    background: #3d2a2a;
+    color: #d98a8a;
     padding: 0.75rem;
     border-radius: 8px;
     margin-bottom: 1rem;

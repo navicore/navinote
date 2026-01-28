@@ -8,10 +8,42 @@
   let text = $state('');
   let remindAt = $state('');
   let showReminder = $state(false);
+  let showCustomTime = $state(false);
   let syncing = $state(false);
   let token = $state(getToken());
   let showSettings = $state(!getToken());
   let syncError = $state('');
+
+  function setReminder(minutes) {
+    const d = new Date(Date.now() + minutes * 60000);
+    remindAt = toLocalISO(d);
+    showCustomTime = false;
+  }
+
+  function setReminderAt(hour, tomorrow = false) {
+    const d = new Date();
+    if (tomorrow) d.setDate(d.getDate() + 1);
+    d.setHours(hour, 0, 0, 0);
+    remindAt = toLocalISO(d);
+    showCustomTime = false;
+  }
+
+  function toLocalISO(d) {
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  }
+
+  function formatReminder(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (d.toDateString() === now.toDateString()) return `Today ${timeStr}`;
+    if (d.toDateString() === tomorrow.toDateString()) return `Tomorrow ${timeStr}`;
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + timeStr;
+  }
 
   async function load() {
     notes = await getAllNotes();
@@ -34,6 +66,7 @@
     text = '';
     remindAt = '';
     showReminder = false;
+    showCustomTime = false;
     await load();
     doSync();
   }
@@ -101,13 +134,27 @@
     />
     <div class="note-options">
       <label>
-        <input type="checkbox" bind:checked={showReminder} />
+        <input type="checkbox" bind:checked={showReminder} onchange={() => { showCustomTime = false; remindAt = ''; }} />
         Remind me
       </label>
-      {#if showReminder}
-        <input type="datetime-local" bind:value={remindAt} />
+      {#if showReminder && remindAt}
+        <span class="reminder-preview">{formatReminder(remindAt)}</span>
+        <button type="button" class="clear-btn" onclick={() => { remindAt = ''; showCustomTime = false; }}>x</button>
       {/if}
     </div>
+    {#if showReminder && !remindAt}
+      <div class="quick-times">
+        <button type="button" onclick={() => setReminder(20)}>20 min</button>
+        <button type="button" onclick={() => setReminder(60)}>1 hour</button>
+        <button type="button" onclick={() => setReminder(120)}>2 hours</button>
+        <button type="button" onclick={() => setReminderAt(13)}>1pm today</button>
+        <button type="button" onclick={() => setReminderAt(6, true)}>6am tomorrow</button>
+        <button type="button" onclick={() => showCustomTime = true}>Custom...</button>
+      </div>
+    {/if}
+    {#if showCustomTime}
+      <input type="datetime-local" bind:value={remindAt} />
+    {/if}
     <button type="submit">Save</button>
   </form>
 
@@ -176,6 +223,27 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
+  }
+  .reminder-preview {
+    font-size: 0.85rem;
+    color: #7a9eb8;
+  }
+  .clear-btn {
+    background: transparent;
+    color: #888;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.8rem;
+  }
+  .quick-times {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .quick-times button {
+    background: #16213e;
+    border: 1px solid #333;
+    font-size: 0.8rem;
+    padding: 0.4rem 0.6rem;
   }
   button {
     padding: 0.5rem 1rem;

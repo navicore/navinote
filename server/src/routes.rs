@@ -47,7 +47,10 @@ pub async fn list_notes(
             .await
     };
 
-    notes.map(Json).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+    notes.map(Json).map_err(|e| {
+        tracing::error!("list_notes query failed: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })
 }
 
 pub async fn create_note(
@@ -68,13 +71,19 @@ pub async fn create_note(
         .bind(&now)
         .execute(&state.pool)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!("create_note insert failed: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let note = sqlx::query_as::<_, Note>("SELECT * FROM notes WHERE id = ?")
         .bind(&id)
         .fetch_one(&state.pool)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(|e| {
+            tracing::error!("create_note fetch failed: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     Ok((StatusCode::CREATED, Json(note)))
 }

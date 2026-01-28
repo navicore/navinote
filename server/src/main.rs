@@ -5,6 +5,7 @@ mod routes;
 use axum::routing::{get, patch, put};
 use axum::Router;
 use tower_http::services::ServeDir;
+use tower_http::trace::TraceLayer;
 
 use routes::AppState;
 
@@ -30,7 +31,8 @@ async fn main() {
         .route("/api/notes", get(routes::list_notes).post(routes::create_note))
         .route("/api/notes/{id}", put(routes::update_note).delete(routes::delete_note))
         .route("/api/notes/{id}/synced", patch(routes::mark_synced))
-        .with_state(state);
+        .with_state(state)
+        .layer(TraceLayer::new_for_http());
 
     let app = api.fallback_service(ServeDir::new(&static_dir));
 

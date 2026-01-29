@@ -1,4 +1,4 @@
-use chrono::NaiveDate;
+use chrono::{DateTime, Local, NaiveDate};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -34,11 +34,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    // Group by date
+    // Group by local date
     let mut by_date: BTreeMap<String, Vec<&Note>> = BTreeMap::new();
     for note in &notes {
-        let date = note.created_at.get(..10).unwrap_or("unknown");
-        by_date.entry(date.to_string()).or_default().push(note);
+        let date = if let Ok(dt) = DateTime::parse_from_rfc3339(&note.created_at) {
+            dt.with_timezone(&Local).format("%Y-%m-%d").to_string()
+        } else {
+            note.created_at.get(..10).unwrap_or("unknown").to_string()
+        };
+        by_date.entry(date).or_default().push(note);
     }
 
     std::fs::create_dir_all(&zet_dir)?;
@@ -50,17 +54,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut content = if is_new {
             let parsed = NaiveDate::parse_from_str(date, "%Y-%m-%d")
                 .unwrap_or_else(|_| NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
-            format!("---\ndate: {}\ntags: [quicknote]\n---\n\n# {}\n\n", date, parsed.format("%A, %B %-d, %Y"))
+            format!("---\ntitle: {}\n---\n\n", parsed.format("%A, %B %-e, %Y").to_string().replace("  ", " "))
         } else {
             std::fs::read_to_string(&file_path)?
         };
 
         for note in day_notes {
-            let line = if note.remind_at.is_some() {
-                let ra = note.remind_at.as_deref().unwrap();
-                format!("* [ ] #reminder {}: {} (via quicknote {})\n", ra, note.text, note.created_at)
+            let line = if let Some(ra) = &note.remind_at {
+                format!("* [ ] #reminder {}: {}\n", ra, note.text)
             } else {
-                format!("* {} (via quicknote {})\n", note.text, note.created_at)
+                format!("* {}\n", note.text)
             };
             content.push_str(&line);
         }

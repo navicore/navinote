@@ -32,6 +32,11 @@
     return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   }
 
+  function toUTCISO(localISO) {
+    if (!localISO) return null;
+    return new Date(localISO).toISOString();
+  }
+
   function formatReminder(iso) {
     if (!iso) return '';
     const d = new Date(iso);
@@ -56,7 +61,7 @@
     const note = {
       id: crypto.randomUUID(),
       text: text.trim(),
-      remind_at: showReminder && remindAt ? remindAt : null,
+      remind_at: showReminder && remindAt ? toUTCISO(remindAt) : null,
       synced: false,
       _synced: false,
       created_at: new Date().toISOString(),

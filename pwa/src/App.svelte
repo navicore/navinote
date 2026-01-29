@@ -106,12 +106,18 @@
       showInstallPrompt = true;
     } else if (isAndroid) {
       installPlatform = 'android';
-      // Listen for the beforeinstallprompt event
+      // Listen for the beforeinstallprompt event (Chrome only)
       window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
         deferredPrompt = e;
         showInstallPrompt = true;
       });
+      // Fallback: show manual instructions after delay if no native prompt
+      setTimeout(() => {
+        if (!deferredPrompt && !showInstallPrompt) {
+          showInstallPrompt = true;
+        }
+      }, 2000);
     }
   }
 
@@ -241,9 +247,11 @@
     <div class="install-prompt">
       {#if installPlatform === 'ios'}
         <p>Install this app: tap <strong>Share</strong> then <strong>Add to Home Screen</strong></p>
-      {:else if installPlatform === 'android'}
+      {:else if installPlatform === 'android' && deferredPrompt}
         <p>Install this app for quick access</p>
         <button onclick={installApp}>Install</button>
+      {:else if installPlatform === 'android'}
+        <p>Install this app: tap <strong>Menu</strong> then <strong>Add to Home Screen</strong></p>
       {/if}
       <button class="dismiss-btn" onclick={dismissInstall}>dismiss</button>
     </div>

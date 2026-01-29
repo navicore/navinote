@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(&zet_dir)?;
 
     for (date, day_notes) in &by_date {
-        let file_path = zet_dir.join(format!("{date}_reminder.md"));
+        let file_path = zet_dir.join(format!("{date}.md"));
         let is_new = !file_path.exists();
 
         let mut content = if is_new {

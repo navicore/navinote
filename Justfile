@@ -17,3 +17,6 @@ dev-server:
 
 docker-build:
     docker build -t navinote .
+
+install:
+    cd sync && cargo install --path .

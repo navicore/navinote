@@ -13,7 +13,7 @@ struct Note {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let url = std::env::var("NAVINOTE_URL").expect("NAVINOTE_URL must be set");
+    let url = std::env::var("NAVINOTE_URL").unwrap_or_else(|_| "https://notes.navicore.tech".to_string());
     let token = std::env::var("NAVINOTE_TOKEN").expect("NAVINOTE_TOKEN must be set");
     let zet_dir = PathBuf::from(std::env::var("NAVINOTE_ZET_DIR").expect("NAVINOTE_ZET_DIR must be set"));
 

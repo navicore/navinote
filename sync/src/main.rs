@@ -61,9 +61,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         for note in day_notes {
             let line = if let Some(ra) = &note.remind_at {
-                format!("* [ ] #reminder {}: {} (via quicknote {})\n", ra, note.text, note.created_at)
+                // Parse and reformat to clean ISO8601 without milliseconds
+                let formatted_ra = if let Ok(dt) = DateTime::parse_from_rfc3339(ra) {
+                    dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()
+                } else {
+                    ra.clone()
+                };
+                format!("* [ ] #reminder {}: {}\n", formatted_ra, note.text)
             } else {
-                format!("* {} (via quicknote {})\n", note.text, note.created_at)
+                format!("* {}\n", note.text)
             };
             content.push_str(&line);
         }

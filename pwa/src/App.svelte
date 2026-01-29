@@ -13,6 +13,10 @@
   let token = $state(getToken());
   let showSettings = $state(!getToken());
   let syncError = $state('');
+  let editingNote = $state(null);
+  let showInstallPrompt = $state(false);
+  let installPlatform = $state('');
+  let deferredPrompt = $state(null);
 
   function setReminder(minutes) {
     const d = new Date(Date.now() + minutes * 60000);
@@ -41,44 +45,157 @@
     if (!iso) return '';
     const d = new Date(iso);
     const now = new Date();
+    const diffMs = d - now;
+    const diffMin = Math.round(diffMs / 60000);
+    const diffHours = Math.round(diffMs / 3600000);
+
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    if (d.toDateString() === now.toDateString()) return `Today ${timeStr}`;
+
+    // Past reminders
+    if (diffMs < 0) {
+      if (d.toDateString() === now.toDateString()) return `Today ${timeStr}`;
+      return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + timeStr;
+    }
+
+    // Within next hour: "in X min"
+    if (diffMin <= 60) return `in ${diffMin} min`;
+
+    // Within next 3 hours: "in X hours"
+    if (diffHours <= 3) return `in ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
+
+    // Later today: "at 4pm"
+    if (d.toDateString() === now.toDateString()) return `at ${timeStr}`;
+
+    // Tomorrow: "Tomorrow 6am"
     if (d.toDateString() === tomorrow.toDateString()) return `Tomorrow ${timeStr}`;
+
+    // Further out: "Jan 15 2:00 PM"
     return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + timeStr;
   }
 
   async function load() {
-    notes = await getAllNotes();
+    const all = await getAllNotes();
+    notes = all.filter(n => !n._deleted);
   }
 
-  onMount(load);
+  onMount(() => {
+    load();
+    checkInstallPrompt();
+  });
+
+  function checkInstallPrompt() {
+    // Already installed as PWA
+    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+      return;
+    }
+
+    // Already dismissed
+    if (localStorage.getItem('install_dismissed')) {
+      return;
+    }
+
+    const ua = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+    const isAndroid = /Android/.test(ua);
+
+    if (isIOS) {
+      installPlatform = 'ios';
+      showInstallPrompt = true;
+    } else if (isAndroid) {
+      installPlatform = 'android';
+      // Listen for the beforeinstallprompt event
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        showInstallPrompt = true;
+      });
+    }
+  }
+
+  function dismissInstall() {
+    showInstallPrompt = false;
+    localStorage.setItem('install_dismissed', 'true');
+  }
+
+  async function installApp() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        showInstallPrompt = false;
+      }
+      deferredPrompt = null;
+    }
+  }
 
   async function addNote() {
     if (!text.trim()) return;
-    const note = {
-      id: crypto.randomUUID(),
-      text: text.trim(),
-      remind_at: showReminder && remindAt ? toUTCISO(remindAt) : null,
-      synced: false,
-      _synced: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    await putNote(note);
-    text = '';
-    remindAt = '';
-    showReminder = false;
-    showCustomTime = false;
+    if (editingNote) {
+      // Update existing note
+      const updated = {
+        ...editingNote,
+        text: text.trim(),
+        remind_at: showReminder && remindAt ? toUTCISO(remindAt) : null,
+        synced: false,
+        _synced: false,
+        updated_at: new Date().toISOString(),
+      };
+      await putNote(updated);
+    } else {
+      // Create new note
+      const note = {
+        id: crypto.randomUUID(),
+        text: text.trim(),
+        remind_at: showReminder && remindAt ? toUTCISO(remindAt) : null,
+        synced: false,
+        _synced: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      await putNote(note);
+    }
+    cancelEdit();
     await load();
     doSync();
   }
 
-  async function removeNote(id) {
-    await deleteNote(id);
+  function editNote(note) {
+    editingNote = note;
+    text = note.text;
+    if (note.remind_at) {
+      showReminder = true;
+      remindAt = toLocalISO(new Date(note.remind_at));
+    } else {
+      showReminder = false;
+      remindAt = '';
+    }
+    showCustomTime = false;
+  }
+
+  function cancelEdit() {
+    editingNote = null;
+    text = '';
+    remindAt = '';
+    showReminder = false;
+    showCustomTime = false;
+  }
+
+  async function removeNote(note) {
+    if (note._synced) {
+      // Mark for deletion sync
+      await putNote({ ...note, _deleted: true });
+    } else {
+      // Not synced yet, just delete locally
+      await deleteNote(note.id);
+    }
+    if (editingNote?.id === note.id) {
+      cancelEdit();
+    }
     await load();
+    doSync();
   }
 
   async function doSync() {
@@ -120,6 +237,18 @@
     <div class="error">{syncError}</div>
   {/if}
 
+  {#if showInstallPrompt}
+    <div class="install-prompt">
+      {#if installPlatform === 'ios'}
+        <p>Install this app: tap <strong>Share</strong> then <strong>Add to Home Screen</strong></p>
+      {:else if installPlatform === 'android'}
+        <p>Install this app for quick access</p>
+        <button onclick={installApp}>Install</button>
+      {/if}
+      <button class="dismiss-btn" onclick={dismissInstall}>dismiss</button>
+    </div>
+  {/if}
+
   {#if showSettings}
     <div class="settings">
       <label>
@@ -131,12 +260,12 @@
   {/if}
 
   <form onsubmit={(e) => { e.preventDefault(); addNote(); }}>
-    <input
-      type="text"
+    <textarea
       bind:value={text}
       placeholder="Quick note..."
+      rows="3"
       autofocus
-    />
+    ></textarea>
     <div class="note-options">
       <label>
         <input type="checkbox" bind:checked={showReminder} onchange={() => { showCustomTime = false; remindAt = ''; }} />
@@ -160,15 +289,20 @@
     {#if showCustomTime}
       <input type="datetime-local" bind:value={remindAt} />
     {/if}
-    <button type="submit">Save</button>
+    <div class="form-actions">
+      <button type="submit">{editingNote ? 'Update' : 'Save'}</button>
+      {#if editingNote}
+        <button type="button" class="cancel-btn" onclick={cancelEdit}>Cancel</button>
+      {/if}
+    </div>
   </form>
 
   <ul class="notes">
     {#each notes as note (note.id)}
-      <li>
+      <li class={editingNote?.id === note.id ? 'editing' : ''} onclick={() => editNote(note)}>
         <div class="note-text">{note.text}</div>
         {#if note.remind_at}
-          <div class="note-meta">Reminder: {formatDate(note.remind_at)}</div>
+          <div class="note-meta reminder-time">Reminder: {formatReminder(note.remind_at)}</div>
         {/if}
         <div class="note-meta">
           {formatDate(note.created_at)}
@@ -176,7 +310,7 @@
             <span class="synced-badge">synced</span>
           {/if}
         </div>
-        <button class="delete-btn" onclick={() => removeNote(note.id)}>delete</button>
+        <button class="delete-btn" onclick={(e) => { e.stopPropagation(); removeNote(note); }}>delete</button>
       </li>
     {/each}
   </ul>
@@ -210,19 +344,46 @@
   }
   .settings label { display: block; margin-bottom: 0.5rem; }
   .settings input { width: 100%; box-sizing: border-box; }
+  .install-prompt {
+    background: #1e3a5f;
+    border: 1px solid #4a6fa5;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .install-prompt p {
+    margin: 0;
+    flex: 1;
+    font-size: 0.9rem;
+  }
+  .dismiss-btn {
+    background: transparent;
+    color: #888;
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+  }
   form {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
     margin-bottom: 1.5rem;
   }
-  input[type="text"], input[type="password"], input[type="datetime-local"] {
+  input[type="text"], input[type="password"], input[type="datetime-local"], textarea {
     padding: 0.75rem;
     border: 1px solid #333;
     border-radius: 6px;
     background: #16213e;
     color: #e0e0e0;
     font-size: 1rem;
+  }
+  textarea {
+    resize: vertical;
+    font-family: inherit;
+    min-height: 4.5rem;
   }
   .note-options {
     display: flex;
@@ -260,15 +421,33 @@
     font-size: 0.9rem;
   }
   button:disabled { opacity: 0.5; }
+  .form-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .cancel-btn {
+    background: transparent;
+    border: 1px solid #4a6fa5;
+  }
   .notes { list-style: none; padding: 0; }
   .notes li {
     background: #16213e;
     padding: 0.75rem;
     border-radius: 8px;
     margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    border: 2px solid transparent;
   }
-  .note-text { margin-bottom: 0.25rem; }
+  .notes li:hover {
+    border-color: #333;
+  }
+  .notes li.editing {
+    border-color: #4a6fa5;
+  }
+  .note-text { margin-bottom: 0.25rem; white-space: pre-wrap; }
   .note-meta { font-size: 0.8rem; color: #888; }
+  .reminder-time { color: #7a9eb8; }
   .synced-badge {
     background: #0f3460;
     padding: 0.1rem 0.4rem;

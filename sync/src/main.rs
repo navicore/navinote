@@ -55,7 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut content = if is_new {
             let parsed = NaiveDate::parse_from_str(date, "%Y-%m-%d")
                 .unwrap_or_else(|_| NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
-            format!("---\ntitle: {}\n---\n\n", parsed.format("%A, %B %-e, %Y").to_string().replace("  ", " "))
+            format!("---\ntitle: {}\n---\n\n\n", parsed.format("%A, %B %-e, %Y").to_string().replace("  ", " "))
         } else {
             std::fs::read_to_string(&file_path)?
         };

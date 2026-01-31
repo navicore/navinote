@@ -8,6 +8,7 @@ struct Note {
     id: String,
     text: String,
     remind_at: Option<String>,
+    done: bool,
     created_at: String,
 }
 
@@ -67,7 +68,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 } else {
                     ra.clone()
                 };
-                format!("* [ ] #reminder {}: {}\n", formatted_ra, note.text)
+                let checkbox = if note.done { "[x]" } else { "[ ]" };
+                format!("* {} #reminder {}: {}\n", checkbox, formatted_ra, note.text)
             } else {
                 format!("* {}\n", note.text)
             };

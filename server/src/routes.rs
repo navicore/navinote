@@ -63,7 +63,7 @@ pub async fn create_note(
     let id = Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
 
-    sqlx::query("INSERT INTO notes (id, text, remind_at, synced, created_at, updated_at) VALUES (?, ?, ?, FALSE, ?, ?)")
+    sqlx::query("INSERT INTO notes (id, text, remind_at, synced, done, created_at, updated_at) VALUES (?, ?, ?, FALSE, FALSE, ?, ?)")
         .bind(&id)
         .bind(&input.text)
         .bind(&input.remind_at)
@@ -157,6 +157,29 @@ pub async fn mark_synced(
     let now = chrono::Utc::now().to_rfc3339();
 
     let result = sqlx::query("UPDATE notes SET synced = TRUE, updated_at = ? WHERE id = ?")
+        .bind(&now)
+        .bind(&id)
+        .execute(&state.pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if result.rows_affected() == 0 {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    Ok(StatusCode::OK)
+}
+
+pub async fn mark_done(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<StatusCode, StatusCode> {
+    check_auth(&headers, &state.token)?;
+
+    let now = chrono::Utc::now().to_rfc3339();
+
+    let result = sqlx::query("UPDATE notes SET done = TRUE, synced = FALSE, updated_at = ? WHERE id = ?")
         .bind(&now)
         .bind(&id)
         .execute(&state.pool)

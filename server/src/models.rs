@@ -23,6 +23,7 @@ pub struct CreateNote {
 pub struct UpdateNote {
     pub text: Option<String>,
     pub remind_at: Option<String>,
+    pub done: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]

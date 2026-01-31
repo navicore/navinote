@@ -147,17 +147,27 @@
   async function addNote() {
     if (!text.trim()) return;
     if (editingNote) {
-      // Update existing note
+      // Update existing note - reset done to false
       const updated = {
         ...editingNote,
         text: text.trim(),
         remind_at: showReminder && remindAt ? toUTCISO(remindAt) : null,
-        done: editingNote.done || false,
-        synced: false,
-        _synced: false,
+        done: false,
         updated_at: new Date().toISOString(),
       };
       await putNote(updated);
+
+      // If synced, update on server directly
+      if (editingNote._synced) {
+        try {
+          await apiFetch(`/api/notes/${editingNote.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ text: updated.text, remind_at: updated.remind_at, done: false }),
+          });
+        } catch (e) {
+          // Will sync later
+        }
+      }
     } else {
       // Create new note
       const note = {

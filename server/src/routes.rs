@@ -109,10 +109,12 @@ pub async fn update_note(
 
     let text = input.text.unwrap_or(existing.text);
     let remind_at = input.remind_at.or(existing.remind_at);
+    let done = input.done.unwrap_or(existing.done);
 
-    sqlx::query("UPDATE notes SET text = ?, remind_at = ?, updated_at = ? WHERE id = ?")
+    sqlx::query("UPDATE notes SET text = ?, remind_at = ?, done = ?, synced = FALSE, updated_at = ? WHERE id = ?")
         .bind(&text)
         .bind(&remind_at)
+        .bind(done)
         .bind(&now)
         .bind(&id)
         .execute(&state.pool)

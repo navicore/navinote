@@ -1,3 +1,5 @@
+[![Docker Build](https://github.com/navicore/navinote/actions/workflows/docker-build.yml/badge.svg)](https://github.com/navicore/navinote/actions/workflows/docker-build.yml)
+
 # navinote
 
 A personal note-taking PWA with reminders and markdown sync.

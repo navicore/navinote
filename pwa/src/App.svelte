@@ -245,14 +245,21 @@
   }
 
   async function markDone(note) {
-    const updated = { ...note, done: true, synced: false, _synced: false, updated_at: new Date().toISOString() };
-    await putNote(updated);
     if (note._synced) {
+      // Already synced - call API directly and keep _synced true
       try {
         await apiFetch(`/api/notes/${note.id}/done`, { method: 'PATCH' });
+        const updated = { ...note, done: true, updated_at: new Date().toISOString() };
+        await putNote(updated);
       } catch (e) {
-        // Will sync later
+        // API failed, mark for sync
+        const updated = { ...note, done: true, _synced: false, updated_at: new Date().toISOString() };
+        await putNote(updated);
       }
+    } else {
+      // Not synced yet - just update locally
+      const updated = { ...note, done: true, updated_at: new Date().toISOString() };
+      await putNote(updated);
     }
     await load();
     doSync();

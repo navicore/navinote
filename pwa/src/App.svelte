@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { getAllNotes, putNote, deleteNote } from './lib/db.js';
   import { syncNotes } from './lib/sync.js';
-  import { getToken, setToken } from './lib/api.js';
+  import { getToken, setToken, apiFetch } from './lib/api.js';
 
   let notes = $state([]);
   let text = $state('');
@@ -17,6 +17,13 @@
   let showInstallPrompt = $state(false);
   let installPlatform = $state('');
   let deferredPrompt = $state(null);
+
+  // Swipe state
+  let swipeNoteId = $state(null);
+  let swipeOffset = $state(0);
+  let swipeStartX = 0;
+  let swipeStartY = 0;
+  const SWIPE_THRESHOLD = 80;
 
   function setReminder(minutes) {
     const d = new Date(Date.now() + minutes * 60000);
@@ -145,6 +152,7 @@
         ...editingNote,
         text: text.trim(),
         remind_at: showReminder && remindAt ? toUTCISO(remindAt) : null,
+        done: editingNote.done || false,
         synced: false,
         _synced: false,
         updated_at: new Date().toISOString(),
@@ -157,6 +165,7 @@
         text: text.trim(),
         remind_at: showReminder && remindAt ? toUTCISO(remindAt) : null,
         synced: false,
+        done: false,
         _synced: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -225,6 +234,59 @@
 
   function formatDate(iso) {
     return new Date(iso).toLocaleString();
+  }
+
+  function getReminderState(note) {
+    if (!note.remind_at) return null;
+    if (note.done) return 'done';
+    const now = new Date();
+    const remindAt = new Date(note.remind_at);
+    return remindAt > now ? 'future' : 'overdue';
+  }
+
+  async function markDone(note) {
+    const updated = { ...note, done: true, synced: false, _synced: false, updated_at: new Date().toISOString() };
+    await putNote(updated);
+    if (note._synced) {
+      try {
+        await apiFetch(`/api/notes/${note.id}/done`, { method: 'PATCH' });
+      } catch (e) {
+        // Will sync later
+      }
+    }
+    await load();
+    doSync();
+  }
+
+  function handleTouchStart(e, noteId) {
+    swipeNoteId = noteId;
+    swipeOffset = 0;
+    swipeStartX = e.touches[0].clientX;
+    swipeStartY = e.touches[0].clientY;
+  }
+
+  function handleTouchMove(e) {
+    if (!swipeNoteId) return;
+    const deltaX = e.touches[0].clientX - swipeStartX;
+    const deltaY = e.touches[0].clientY - swipeStartY;
+    // Only allow horizontal swipe if it's more horizontal than vertical
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+      e.preventDefault();
+      swipeOffset = deltaX;
+    }
+  }
+
+  async function handleTouchEnd(note) {
+    if (!swipeNoteId) return;
+    if (swipeOffset < -SWIPE_THRESHOLD) {
+      // Swipe left → delete
+      await removeNote(note);
+    } else if (swipeOffset > SWIPE_THRESHOLD && note.remind_at && !note.done) {
+      // Swipe right → done (only for reminders that aren't already done)
+      await markDone(note);
+    }
+    swipeNoteId = null;
+    swipeOffset = 0;
   }
 </script>
 
@@ -307,10 +369,29 @@
 
   <ul class="notes">
     {#each notes as note (note.id)}
-      <li class={editingNote?.id === note.id ? 'editing' : ''} onclick={() => editNote(note)}>
+      {@const reminderState = getReminderState(note)}
+      <li
+        class="{editingNote?.id === note.id ? 'editing' : ''} {reminderState ? `reminder-${reminderState}` : ''}"
+        style={swipeNoteId === note.id ? `transform: translateX(${swipeOffset}px)` : ''}
+        onclick={() => editNote(note)}
+        ontouchstart={(e) => handleTouchStart(e, note.id)}
+        ontouchmove={handleTouchMove}
+        ontouchend={() => handleTouchEnd(note)}
+      >
+        {#if swipeNoteId === note.id && swipeOffset < -30}
+          <div class="swipe-hint delete-hint">delete</div>
+        {/if}
+        {#if swipeNoteId === note.id && swipeOffset > 30 && note.remind_at && !note.done}
+          <div class="swipe-hint done-hint">done</div>
+        {/if}
         <div class="note-text">{note.text}</div>
         {#if note.remind_at}
-          <div class="note-meta reminder-time">Reminder: {formatReminder(note.remind_at)}</div>
+          <div class="note-meta reminder-time">
+            {#if note.done}
+              <span class="done-badge">done</span>
+            {/if}
+            Reminder: {formatReminder(note.remind_at)}
+          </div>
         {/if}
         <div class="note-meta">
           {formatDate(note.created_at)}
@@ -318,7 +399,6 @@
             <span class="synced-badge">synced</span>
           {/if}
         </div>
-        <button class="delete-btn" onclick={(e) => { e.stopPropagation(); removeNote(note); }}>delete</button>
       </li>
     {/each}
   </ul>
@@ -470,11 +550,44 @@
     margin-bottom: 1rem;
     font-size: 0.9rem;
   }
-  .delete-btn {
-    background: transparent;
-    color: #888;
+  /* Reminder state colors */
+  .notes li.reminder-future {
+    border-left: 3px solid #4a9e6a;
+  }
+  .notes li.reminder-overdue {
+    border-left: 3px solid #c47a5a;
+  }
+  .notes li.reminder-done {
+    opacity: 0.6;
+    border-left: 3px solid #555;
+  }
+  .done-badge {
+    background: #3a5a4a;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    margin-right: 0.3rem;
+  }
+  /* Swipe styles */
+  .notes li {
+    position: relative;
+    touch-action: pan-y;
+    transition: transform 0.1s ease-out;
+  }
+  .swipe-hint {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
     font-size: 0.8rem;
-    padding: 0.2rem 0.5rem;
-    margin-top: 0.25rem;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+  .delete-hint {
+    right: 0.75rem;
+    color: #c47a5a;
+  }
+  .done-hint {
+    left: 0.75rem;
+    color: #4a9e6a;
   }
 </style>

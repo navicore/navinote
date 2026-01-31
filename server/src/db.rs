@@ -19,6 +19,7 @@ pub async fn init_pool(db_path: &str) -> SqlitePool {
             text TEXT NOT NULL,
             remind_at TEXT,
             synced BOOLEAN NOT NULL DEFAULT FALSE,
+            done BOOLEAN NOT NULL DEFAULT FALSE,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )",
@@ -26,6 +27,11 @@ pub async fn init_pool(db_path: &str) -> SqlitePool {
     .execute(&pool)
     .await
     .expect("failed to run migration");
+
+    // Migration: add done column if missing
+    let _ = sqlx::query("ALTER TABLE notes ADD COLUMN done BOOLEAN NOT NULL DEFAULT FALSE")
+        .execute(&pool)
+        .await;
 
     pool
 }

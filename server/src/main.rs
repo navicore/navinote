@@ -31,6 +31,7 @@ async fn main() {
         .route("/api/notes", get(routes::list_notes).post(routes::create_note))
         .route("/api/notes/{id}", put(routes::update_note).delete(routes::delete_note))
         .route("/api/notes/{id}/synced", patch(routes::mark_synced))
+        .route("/api/notes/{id}/done", patch(routes::mark_done))
         .with_state(state)
         .layer(TraceLayer::new_for_http());
 

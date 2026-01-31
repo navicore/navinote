@@ -6,6 +6,7 @@ pub struct Note {
     pub text: String,
     pub remind_at: Option<String>,
     pub synced: bool,
+    pub done: bool,
     pub created_at: String,
     pub updated_at: String,
 }

@@ -15,6 +15,8 @@ pub struct Note {
 pub struct CreateNote {
     pub text: String,
     pub remind_at: Option<String>,
+    #[serde(default)]
+    pub done: bool,
 }
 
 #[derive(Debug, Deserialize)]

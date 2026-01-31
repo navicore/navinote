@@ -28,7 +28,7 @@ export async function syncNotes() {
     try {
       const saved = await apiFetch('/api/notes', {
         method: 'POST',
-        body: JSON.stringify({ text: note.text, remind_at: note.remind_at || null }),
+        body: JSON.stringify({ text: note.text, remind_at: note.remind_at || null, done: note.done || false }),
       });
       // Replace local with server version
       await deleteNote(note.id);

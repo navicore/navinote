@@ -245,24 +245,16 @@
   }
 
   async function markDone(note) {
+    // Update local - preserve _synced state
+    const updated = { ...note, done: true, updated_at: new Date().toISOString() };
+    await putNote(updated);
+
+    // If synced, try to update server (fire and forget)
     if (note._synced) {
-      // Already synced - call API directly and keep _synced true
-      try {
-        await apiFetch(`/api/notes/${note.id}/done`, { method: 'PATCH' });
-        const updated = { ...note, done: true, updated_at: new Date().toISOString() };
-        await putNote(updated);
-      } catch (e) {
-        // API failed, mark for sync
-        const updated = { ...note, done: true, _synced: false, updated_at: new Date().toISOString() };
-        await putNote(updated);
-      }
-    } else {
-      // Not synced yet - just update locally
-      const updated = { ...note, done: true, updated_at: new Date().toISOString() };
-      await putNote(updated);
+      apiFetch(`/api/notes/${note.id}/done`, { method: 'PATCH' }).catch(() => {});
     }
+
     await load();
-    doSync();
   }
 
   function handleTouchStart(e, noteId) {

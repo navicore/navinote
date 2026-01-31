@@ -63,10 +63,11 @@ pub async fn create_note(
     let id = Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
 
-    sqlx::query("INSERT INTO notes (id, text, remind_at, synced, done, created_at, updated_at) VALUES (?, ?, ?, FALSE, FALSE, ?, ?)")
+    sqlx::query("INSERT INTO notes (id, text, remind_at, synced, done, created_at, updated_at) VALUES (?, ?, ?, FALSE, ?, ?, ?)")
         .bind(&id)
         .bind(&input.text)
         .bind(&input.remind_at)
+        .bind(input.done)
         .bind(&now)
         .bind(&now)
         .execute(&state.pool)

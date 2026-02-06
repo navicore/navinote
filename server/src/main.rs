@@ -2,8 +2,8 @@ mod db;
 mod models;
 mod routes;
 
-use axum::routing::{get, patch, put};
 use axum::Router;
+use axum::routing::{get, patch, put};
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 
@@ -28,8 +28,14 @@ async fn main() {
 
     let api = Router::new()
         .route("/api/health", get(routes::health))
-        .route("/api/notes", get(routes::list_notes).post(routes::create_note))
-        .route("/api/notes/{id}", put(routes::update_note).delete(routes::delete_note))
+        .route(
+            "/api/notes",
+            get(routes::list_notes).post(routes::create_note),
+        )
+        .route(
+            "/api/notes/{id}",
+            put(routes::update_note).delete(routes::delete_note),
+        )
         .route("/api/notes/{id}/synced", patch(routes::mark_synced))
         .route("/api/notes/{id}/done", patch(routes::mark_done))
         .with_state(state)

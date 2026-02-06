@@ -14,9 +14,11 @@ struct Note {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let url = std::env::var("NAVINOTE_URL").unwrap_or_else(|_| "https://notes.navicore.tech".to_string());
+    let url =
+        std::env::var("NAVINOTE_URL").unwrap_or_else(|_| "https://notes.navicore.tech".to_string());
     let token = std::env::var("NAVINOTE_TOKEN").expect("NAVINOTE_TOKEN must be set");
-    let zet_dir = PathBuf::from(std::env::var("NAVINOTE_ZET_DIR").expect("NAVINOTE_ZET_DIR must be set"));
+    let zet_dir =
+        PathBuf::from(std::env::var("NAVINOTE_ZET_DIR").expect("NAVINOTE_ZET_DIR must be set"));
 
     let client = reqwest::Client::new();
 
@@ -55,7 +57,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut content = if is_new {
             let parsed = NaiveDate::parse_from_str(date, "%Y-%m-%d")
                 .unwrap_or_else(|_| NaiveDate::from_ymd_opt(2000, 1, 1).unwrap());
-            format!("---\ntitle: {}\n---\n\n\n", parsed.format("%A, %B %-e, %Y").to_string().replace("  ", " "))
+            format!(
+                "---\ntitle: {}\n---\n\n\n",
+                parsed
+                    .format("%A, %B %-e, %Y")
+                    .to_string()
+                    .replace("  ", " ")
+            )
         } else {
             std::fs::read_to_string(&file_path)?
         };
@@ -77,7 +85,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         std::fs::write(&file_path, &content)?;
-        println!("Wrote {} note(s) to {}", day_notes.len(), file_path.display());
+        println!(
+            "Wrote {} note(s) to {}",
+            day_notes.len(),
+            file_path.display()
+        );
     }
 
     // Mark all as synced

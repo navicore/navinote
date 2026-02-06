@@ -1,7 +1,7 @@
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
-use axum::Json;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
@@ -182,12 +182,13 @@ pub async fn mark_done(
 
     let now = chrono::Utc::now().to_rfc3339();
 
-    let result = sqlx::query("UPDATE notes SET done = TRUE, synced = FALSE, updated_at = ? WHERE id = ?")
-        .bind(&now)
-        .bind(&id)
-        .execute(&state.pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let result =
+        sqlx::query("UPDATE notes SET done = TRUE, synced = FALSE, updated_at = ? WHERE id = ?")
+            .bind(&now)
+            .bind(&id)
+            .execute(&state.pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     if result.rows_affected() == 0 {
         return Err(StatusCode::NOT_FOUND);

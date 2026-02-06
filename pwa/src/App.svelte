@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { getAllNotes, putNote, deleteNote } from './lib/db.js';
   import { syncNotes } from './lib/sync.js';
-  import { getToken, setToken, apiFetch } from './lib/api.js';
+  import { getToken, setToken } from './lib/api.js';
 
   let notes = $state([]);
   let text = $state('');
@@ -17,6 +17,8 @@
   let showInstallPrompt = $state(false);
   let installPlatform = $state('');
   let deferredPrompt = $state(null);
+
+  let textareaEl;
 
   // Swipe state
   let swipeNoteId = $state(null);
@@ -91,6 +93,7 @@
   onMount(() => {
     load();
     checkInstallPrompt();
+    textareaEl?.focus();
   });
 
   function checkInstallPrompt() {
@@ -154,20 +157,10 @@
         remind_at: showReminder && remindAt ? toUTCISO(remindAt) : null,
         done: false,
         updated_at: new Date().toISOString(),
+        _dirty: true,
+        _syncError: false,
       };
       await putNote(updated);
-
-      // If synced, update on server directly
-      if (editingNote._synced) {
-        try {
-          await apiFetch(`/api/notes/${editingNote.id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ text: updated.text, remind_at: updated.remind_at, done: false }),
-          });
-        } catch (e) {
-          // Will sync later
-        }
-      }
     } else {
       // Create new note
       const note = {
@@ -177,6 +170,8 @@
         synced: false,
         done: false,
         _synced: false,
+        _dirty: false,
+        _syncError: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -211,7 +206,7 @@
   async function removeNote(note) {
     if (note._synced) {
       // Mark for deletion sync
-      await putNote({ ...note, _deleted: true });
+      await putNote({ ...note, _deleted: true, _dirty: false });
     } else {
       // Not synced yet, just delete locally
       await deleteNote(note.id);
@@ -255,16 +250,10 @@
   }
 
   async function markDone(note) {
-    // Update local - preserve _synced state
-    const updated = { ...note, done: true, updated_at: new Date().toISOString() };
+    const updated = { ...note, done: true, updated_at: new Date().toISOString(), _dirty: true, _syncError: false };
     await putNote(updated);
-
-    // If synced, try to update server (fire and forget)
-    if (note._synced) {
-      apiFetch(`/api/notes/${note.id}/done`, { method: 'PATCH' }).catch(() => {});
-    }
-
     await load();
+    doSync();
   }
 
   function handleTouchStart(e, noteId) {
@@ -340,10 +329,10 @@
 
   <form onsubmit={(e) => { e.preventDefault(); addNote(); }}>
     <textarea
+      bind:this={textareaEl}
       bind:value={text}
       placeholder="Quick note..."
       rows="3"
-      autofocus
     ></textarea>
     <div class="note-options">
       <label>
@@ -382,7 +371,6 @@
       <li
         class="{editingNote?.id === note.id ? 'editing' : ''} {reminderState ? `reminder-${reminderState}` : ''}"
         style={swipeNoteId === note.id ? `transform: translateX(${swipeOffset}px)` : ''}
-        onclick={() => editNote(note)}
         ontouchstart={(e) => handleTouchStart(e, note.id)}
         ontouchmove={handleTouchMove}
         ontouchend={() => handleTouchEnd(note)}
@@ -393,21 +381,25 @@
         {#if swipeNoteId === note.id && swipeOffset > 30 && note.remind_at && !note.done}
           <div class="swipe-hint done-hint">done</div>
         {/if}
-        <div class="note-text">{note.text}</div>
-        {#if note.remind_at}
-          <div class="note-meta reminder-time">
-            {#if note.done}
-              <span class="done-badge">done</span>
-            {/if}
-            Reminder: {formatReminder(note.remind_at)}
-          </div>
-        {/if}
-        <div class="note-meta">
-          {formatDate(note.created_at)}
-          {#if note._synced}
-            <span class="synced-badge">synced</span>
+        <button type="button" class="note-btn" onclick={() => editNote(note)}>
+          <div class="note-text">{note.text}</div>
+          {#if note.remind_at}
+            <div class="note-meta reminder-time">
+              {#if note.done}
+                <span class="done-badge">done</span>
+              {/if}
+              Reminder: {formatReminder(note.remind_at)}
+            </div>
           {/if}
-        </div>
+          <div class="note-meta">
+            {formatDate(note.created_at)}
+            {#if note._syncError}
+              <span class="error-badge">error</span>
+            {:else if note._synced && !note._dirty}
+              <span class="synced-badge">synced</span>
+            {/if}
+          </div>
+        </button>
       </li>
     {/each}
   </ul>
@@ -469,7 +461,7 @@
     gap: 0.5rem;
     margin-bottom: 1.5rem;
   }
-  input[type="text"], input[type="password"], input[type="datetime-local"], textarea {
+  input[type="password"], input[type="datetime-local"], textarea {
     padding: 0.75rem;
     border: 1px solid #333;
     border-radius: 6px;
@@ -529,10 +521,9 @@
   .notes { list-style: none; padding: 0; }
   .notes li {
     background: #16213e;
-    padding: 0.75rem;
+    padding: 0;
     border-radius: 8px;
     margin-bottom: 0.5rem;
-    cursor: pointer;
     transition: border-color 0.15s;
     border: 2px solid transparent;
   }
@@ -542,11 +533,30 @@
   .notes li.editing {
     border-color: #4a6fa5;
   }
+  .note-btn {
+    display: block;
+    width: 100%;
+    padding: 0.75rem;
+    background: transparent;
+    border: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 6px;
+  }
   .note-text { margin-bottom: 0.25rem; white-space: pre-wrap; }
   .note-meta { font-size: 0.8rem; color: #888; }
   .reminder-time { color: #7a9eb8; }
   .synced-badge {
     background: #0f3460;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+  }
+  .error-badge {
+    background: #5a3a3a;
+    color: #d98a8a;
     padding: 0.1rem 0.4rem;
     border-radius: 4px;
     font-size: 0.7rem;

@@ -10,7 +10,7 @@ test:
     cargo test
 
 lint-pwa:
-    cd pwa && SVELTE_STRICT=1 npm run build
+    cd pwa && npm ci && SVELTE_STRICT=1 npm run build
 
 build: build-pwa build-server build-sync
 

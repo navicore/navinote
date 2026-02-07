@@ -223,10 +223,10 @@
     syncError = '';
     try {
       await syncNotes();
-      await load();
     } catch (e) {
       syncError = e.message;
     } finally {
+      await load();
       syncing = false;
     }
   }

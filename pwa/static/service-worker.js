@@ -1,4 +1,4 @@
-const CACHE_NAME = 'navinote-v2';
+const CACHE_NAME = 'navinote-v3';
 const PRECACHE = ['/', '/index.html'];
 
 self.addEventListener('install', (event) => {

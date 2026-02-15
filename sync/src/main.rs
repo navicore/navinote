@@ -78,6 +78,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 };
                 let checkbox = if note.done { "[x]" } else { "[ ]" };
                 format!("* {} #reminder {}: {}\n", checkbox, formatted_ra, note.text)
+            } else if note.text.contains('\n') {
+                format!("\n---\n\n{}\n\n---\n", note.text)
             } else {
                 format!("* {}\n", note.text)
             };

@@ -19,6 +19,8 @@
   let deferredPrompt = $state(null);
 
   let textareaEl;
+  let showModal = $state(false);
+  let modalTextareaEl = $state(null);
 
   // Swipe state
   let swipeNoteId = $state(null);
@@ -26,6 +28,21 @@
   let swipeStartX = 0;
   let swipeStartY = 0;
   const SWIPE_THRESHOLD = 80;
+
+  function openModal() {
+    showModal = true;
+    document.body.style.overflow = 'hidden';
+    requestAnimationFrame(() => modalTextareaEl?.focus());
+  }
+
+  function closeModal() {
+    showModal = false;
+    document.body.style.overflow = '';
+  }
+
+  function handleModalKeydown(e) {
+    if (e.key === 'Escape') cancelEdit();
+  }
 
   function setReminder(minutes) {
     const d = new Date(Date.now() + minutes * 60000);
@@ -193,6 +210,7 @@
       remindAt = '';
     }
     showCustomTime = false;
+    openModal();
   }
 
   function cancelEdit() {
@@ -201,6 +219,7 @@
     remindAt = '';
     showReminder = false;
     showCustomTime = false;
+    closeModal();
   }
 
   async function removeNote(note) {
@@ -328,12 +347,20 @@
   {/if}
 
   <form onsubmit={(e) => { e.preventDefault(); addNote(); }}>
-    <textarea
-      bind:this={textareaEl}
-      bind:value={text}
-      placeholder="Quick note..."
-      rows="3"
-    ></textarea>
+    <div class="textarea-wrap">
+      <textarea
+        bind:this={textareaEl}
+        bind:value={text}
+        placeholder="Quick note..."
+        rows="3"
+      ></textarea>
+      <button type="button" class="expand-btn" aria-label="Expand editor" onclick={openModal}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <polyline points="10,2 14,2 14,6" /><line x1="14" y1="2" x2="9" y2="7" />
+          <polyline points="6,14 2,14 2,10" /><line x1="2" y1="14" x2="7" y2="9" />
+        </svg>
+      </button>
+    </div>
     <div class="note-options">
       <label>
         <input type="checkbox" bind:checked={showReminder} onchange={() => { showCustomTime = false; remindAt = ''; }} />
@@ -403,6 +430,52 @@
       </li>
     {/each}
   </ul>
+
+  {#if showModal}
+    <div class="modal-overlay" role="dialog" aria-modal="true" tabindex="-1" onkeydown={handleModalKeydown}>
+      <form class="modal-form" onsubmit={(e) => { e.preventDefault(); addNote(); }}>
+        <div class="modal-header">
+          <span class="modal-title">{editingNote ? 'Edit Note' : 'New Note'}</span>
+          <button type="button" class="modal-close" onclick={cancelEdit}>&times;</button>
+        </div>
+        <textarea
+          class="modal-textarea"
+          bind:this={modalTextareaEl}
+          bind:value={text}
+          placeholder="Write your note..."
+        ></textarea>
+        <div class="modal-controls">
+          <div class="note-options">
+            <label>
+              <input type="checkbox" bind:checked={showReminder} onchange={() => { showCustomTime = false; remindAt = ''; }} />
+              Remind me
+            </label>
+            {#if showReminder && remindAt}
+              <span class="reminder-preview">{formatReminder(remindAt)}</span>
+              <button type="button" class="clear-btn" onclick={() => { remindAt = ''; showCustomTime = false; }}>x</button>
+            {/if}
+          </div>
+          {#if showReminder && !remindAt}
+            <div class="quick-times">
+              <button type="button" onclick={() => setReminder(20)}>20 min</button>
+              <button type="button" onclick={() => setReminder(60)}>1 hour</button>
+              <button type="button" onclick={() => setReminder(120)}>2 hours</button>
+              <button type="button" onclick={() => setReminderAt(13)}>1pm today</button>
+              <button type="button" onclick={() => setReminderAt(6, true)}>6am tomorrow</button>
+              <button type="button" onclick={() => showCustomTime = true}>Custom...</button>
+            </div>
+          {/if}
+          {#if showCustomTime}
+            <input type="datetime-local" bind:value={remindAt} />
+          {/if}
+          <div class="form-actions">
+            <button type="submit">{editingNote ? 'Update' : 'Save'}</button>
+            <button type="button" class="cancel-btn" onclick={cancelEdit}>Cancel</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  {/if}
 </main>
 
 <style>
@@ -608,5 +681,76 @@
   .done-hint {
     left: 0.75rem;
     color: #4a9e6a;
+  }
+  /* Textarea wrap + expand button */
+  .textarea-wrap {
+    position: relative;
+  }
+  .expand-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: transparent;
+    border: 1px solid #333;
+    color: #888;
+    padding: 0.3rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Modal overlay */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: #1a1a2e;
+    z-index: 1000;
+  }
+  .modal-form {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1rem;
+    padding-top: calc(1rem + env(safe-area-inset-top));
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+    box-sizing: border-box;
+    gap: 0.5rem;
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .modal-title {
+    color: #7a9eb8;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+  .modal-close {
+    background: transparent;
+    border: none;
+    color: #888;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+  }
+  .modal-textarea {
+    flex: 1;
+    resize: none;
+    padding: 0.75rem;
+    border: 1px solid #333;
+    border-radius: 6px;
+    background: #16213e;
+    color: #e0e0e0;
+    font-size: 1rem;
+    font-family: inherit;
+  }
+  .modal-controls {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 </style>

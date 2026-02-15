@@ -3,8 +3,10 @@ mod models;
 mod routes;
 
 use axum::Router;
+use axum::http::HeaderValue;
 use axum::routing::{get, patch, put};
 use tower_http::services::ServeDir;
+use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 
 use routes::AppState;
@@ -41,7 +43,15 @@ async fn main() {
         .with_state(state)
         .layer(TraceLayer::new_for_http());
 
-    let app = api.fallback_service(ServeDir::new(&static_dir));
+    let static_service = ServeDir::new(&static_dir);
+    let static_with_headers = tower::ServiceBuilder::new()
+        .layer(SetResponseHeaderLayer::if_not_present(
+            axum::http::header::CACHE_CONTROL,
+            HeaderValue::from_static("no-cache"),
+        ))
+        .service(static_service);
+
+    let app = api.fallback_service(static_with_headers);
 
     let listener = tokio::net::TcpListener::bind(("0.0.0.0", port))
         .await

@@ -210,7 +210,6 @@
       remindAt = '';
     }
     showCustomTime = false;
-    openModal();
   }
 
   function cancelEdit() {

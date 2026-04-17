@@ -1,6 +1,6 @@
 # Rust
 target/
-Cargo.lock
+.claude/
 
 # Node
 node_modules/

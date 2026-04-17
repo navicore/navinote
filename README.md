@@ -56,6 +56,23 @@ Synced notes are appended to daily markdown files (`YYYY-MM-DD.md`) with reminde
 - Reminder color coding (green=future, orange=overdue, dimmed=done)
 - iOS/Android install prompts
 
+## CI
+
+CI is defined in `.github/workflows/ci.yml` and runs on every PR and push to `main`. It invokes a single command — `just ci` — which chains:
+
+- `fmt-check` — `cargo fmt --all -- --check`
+- `lint` — `cargo clippy --locked --workspace --all-targets -- -D warnings` plus a strict PWA build (`SVELTE_STRICT=1`)
+- `test` — `cargo test --locked --workspace --all-targets`
+- `build` — PWA, server, and sync release builds
+
+The Rust toolchain is pinned to `1.93.0` in two places that must stay in sync: `rust-toolchain.toml` (local dev) and the `toolchain:` input of the CI workflow. All `cargo` invocations use `--locked`, so a stale `Cargo.lock` fails the build instead of silently re-resolving.
+
+Run the exact same checks locally before pushing:
+
+```bash
+just ci
+```
+
 ## Environment Variables
 
 | Variable | Required | Default | Description |

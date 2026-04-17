@@ -1,3 +1,5 @@
+# This workflow ONLY calls `just` commands.
+# The justfile is the source of truth — do not duplicate build logic here.
 name: CI
 
 on:
@@ -12,8 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: 1.93.0
           components: rustfmt, clippy
 
       - uses: actions/setup-node@v4
@@ -21,5 +24,15 @@ jobs:
           node-version: '22'
 
       - uses: extractions/setup-just@v2
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       - run: just ci

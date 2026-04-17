@@ -5,12 +5,13 @@ RUN npm ci
 COPY pwa/ ./
 RUN npm run build
 
-FROM rust:1.85-bookworm AS rust-build
+FROM rust:1.93-bookworm AS rust-build
 WORKDIR /app
-COPY Cargo.toml ./
+COPY rust-toolchain.toml ./
+COPY Cargo.toml Cargo.lock ./
 COPY server/ server/
 COPY sync/ sync/
-RUN cargo build --release -p navinote-server
+RUN cargo build --locked --release -p navinote-server
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*

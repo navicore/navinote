@@ -1,3 +1,8 @@
+<!-- ghmig:moved -->
+> **This repository has moved to [https://git.navicore.tech/navicore/navinote](https://git.navicore.tech/navicore/navinote).**
+>
+> The GitHub copy is archived and no longer maintained.
+
 [![Docker Build](https://github.com/navicore/navinote/actions/workflows/docker-build.yml/badge.svg)](https://github.com/navicore/navinote/actions/workflows/docker-build.yml)
 
 # navinote
